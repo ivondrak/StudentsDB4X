@@ -1,18 +1,26 @@
 import Foundation
 
-class Student: Identifiable, Codable {
+class Student: Identifiable, Codable, Hashable {
     var id: String
-    var firstName: String
-    var lastName: String
+    var first_name: String
+    var last_name: String
     var email: String
-    var javaExam: Int
+    var java_exam: Int
     
-    init(id: String, firstName: String, lastName: String, email: String, javaExam: Int) {
+    init(id: String, first_name: String, last_name: String, email: String, java_exam: Int) {
         self.id = id
-        self.firstName = firstName
-        self.lastName = lastName
+        self.first_name = first_name
+        self.last_name = last_name
         self.email = email
-        self.javaExam = javaExam
+        self.java_exam = java_exam
+    }
+    
+    static func == (lhs: Student, rhs: Student) -> Bool {
+        return lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
@@ -35,8 +43,8 @@ class StudentsClass: ObservableObject {
     }
 }
 
-class StudentsDB {
-    private let baseURL = "http://10.0.1.82:3030"
+class StudentsDB: @unchecked Sendable {
+    private let baseURL = "http://localhost:3030"
     private weak var studentsClass: StudentsClass?
     
     init(studentsClass: StudentsClass) {
@@ -49,7 +57,6 @@ class StudentsDB {
             print("Invalid URL")
             return
         }
-        print("URL: ", url)
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             if let error = error {
                 print("Error fetching students: \(error.localizedDescription)")
@@ -59,6 +66,10 @@ class StudentsDB {
             guard let data = data else {
                 print("No data returned")
                 return
+            }
+            
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("JSON Response: ", jsonString)
             }
             
             do {
@@ -73,5 +84,33 @@ class StudentsDB {
                 print("Error decoding students: \(error.localizedDescription)")
             }
         }.resume()
+    }
+    
+    func updateStudent(_ student: Student) async -> Bool {
+        guard let url = URL(string: "\(baseURL)/students/\(student.id)") else {
+            print("Invalid URL")
+            return false
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            let jsonData = try JSONEncoder().encode(student)
+            request.httpBody = jsonData
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                print("Student updated successfully: \(String(data: data, encoding: .utf8) ?? "")")
+                return true
+            } else {
+                print("Failed to update student: \(response)")
+                return false
+            }
+        } catch {
+            print("Error updating student: \(error.localizedDescription)")
+            return false
+        }
     }
 }
