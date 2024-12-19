@@ -44,7 +44,7 @@ class StudentsClass: ObservableObject {
 }
 
 class StudentsDB: @unchecked Sendable {
-    private let baseURL = "http://localhost:3030"
+    private let baseURL = "https://dev.ivondrak.cz/node"
     private weak var studentsClass: StudentsClass?
     
     init(studentsClass: StudentsClass) {
@@ -86,6 +86,37 @@ class StudentsDB: @unchecked Sendable {
         }.resume()
     }
     
+    func addStudent(_ student: Student) async -> Bool {
+
+        // Přidání studenta do databáze (POST request)
+        guard let url = URL(string: "\(baseURL)/students") else {
+            print( "Invalid URL")
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            let jsonData = try JSONEncoder().encode(student)
+            request.httpBody = jsonData
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 201 {
+                print("Student added successfully: \(String(data: data, encoding: .utf8) ?? "")")
+                return true
+            } else {
+                print("Failed to add student: \(response)")
+                return false
+            }
+        }
+        catch {
+            print("Error adding student: \(error)")
+            return false
+        }
+    }
+    
     func updateStudent(_ student: Student) async -> Bool {
         guard let url = URL(string: "\(baseURL)/students/\(student.id)") else {
             print("Invalid URL")
@@ -110,6 +141,34 @@ class StudentsDB: @unchecked Sendable {
             }
         } catch {
             print("Error updating student: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    // Funkce pro smazání studenta
+    func deleteStudent(withId id: String) async -> Bool {
+        guard let url = URL(string: "\(baseURL)/students/\(id)") else {
+            print("Invalid URL")
+            return false
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 204 {
+                print("Student deleted successfully")
+                return true
+            } else if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 404 {
+                print("Student not found")
+                return false
+            } else {
+                print("Failed to delete student: \(response)")
+                return false
+            }
+        } catch {
+            print("Error deleting student: \(error.localizedDescription)")
             return false
         }
     }

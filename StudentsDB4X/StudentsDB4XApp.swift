@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct StudentsDB4XApp: App {
     var body: some Scene {
-        WindowGroup {
+        WindowGroup{
             ContentView()
         }
     }
